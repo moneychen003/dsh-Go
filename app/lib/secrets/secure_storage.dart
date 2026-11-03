@@ -7,7 +7,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// The four secret-storage operations used by this app.
 ///
 /// OH uses the app's HUKS channel. Other platforms and explicit test injections
-/// keep the original flutter_secure_storage implementation and options.
+/// keep the original flutter_secure_storage implementation and options, except
+/// that on iOS an item stays on this device instead of following a backup to the
+/// next one.
 class AppSecureStorage {
   const AppSecureStorage([this._injected]) : _platform = null;
 
@@ -19,7 +21,9 @@ class AppSecureStorage {
   static const _channel = MethodChannel('dsh/secrets');
 
   bool get _ohos => _injected == null && (_platform ?? Platform.operatingSystem) == 'ohos';
-  FlutterSecureStorage get _fallback => _injected ?? const FlutterSecureStorage();
+  FlutterSecureStorage get _fallback =>
+      _injected ??
+      const FlutterSecureStorage(iOptions: IOSOptions(accessibility: KeychainAccessibility.unlocked_this_device));
 
   Future<String?> read({required String key}) async {
     if (!_ohos) return _fallback.read(key: key);
