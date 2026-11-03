@@ -13,6 +13,7 @@ internal class InputProbe(private val displayId: Int) {
     private val received = CountDownLatch(1)
     @Volatile private var target: Target? = null
     @Volatile private var failure: Throwable? = null
+    @Volatile private var skipped = false
     private var downTime: Long? = null
     private var down = false
 
@@ -26,6 +27,17 @@ internal class InputProbe(private val displayId: Int) {
         ready.countDown()
     }
 
+    /**
+     * Some ROMs refuse to attach the probe window to a virtual display (for example ColorOS on
+     * Android 16 raises SecurityException from Presentation.show()). That refusal says nothing
+     * about whether later background injection will work, so mark the probe inconclusive instead
+     * of failing the gate: ready + skipped means "self-check unavailable", not "input denied".
+     */
+    fun skip() {
+        skipped = true
+        ready.countDown()
+    }
+
     fun verify(
         now: () -> Long,
         send: (Target, Long) -> Unit,
@@ -33,6 +45,7 @@ internal class InputProbe(private val displayId: Int) {
         receiptTimeoutMs: Long = 1000,
     ) {
         if (!ready.await(readyTimeoutMs, TimeUnit.MILLISECONDS)) throw Failure("inputWindowNotReady")
+        if (skipped) return
         failure?.let { throw it }
         val point = target ?: throw Failure("inputWindowNotReady")
         if (displayId <= 0 || point.displayId != displayId || point.x <= 0 || point.y <= 0)

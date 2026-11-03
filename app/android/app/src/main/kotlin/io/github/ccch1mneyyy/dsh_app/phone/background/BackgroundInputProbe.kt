@@ -69,7 +69,11 @@ internal class BackgroundInputProbe(private val context: Context, private val di
                 dialog.show()
                 window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
             } catch (e: Exception) {
-                probe.fail(if (e is SecurityException) e else InputProbe.Failure("inputWindowNotReady"))
+                // A ROM that denies the probe window (ColorOS/Android 16 raises SecurityException
+                // here) is not proof that background input is rejected. Keep the gate usable and
+                // let real background tasks surface their own injection/tree failures.
+                if (e is SecurityException) probe.skip()
+                else probe.fail(InputProbe.Failure("inputWindowNotReady"))
             }
         }) throw InputProbe.Failure("inputWindowNotReady")
         probe.verify(now = SystemClock::uptimeMillis, send = { target, time ->
